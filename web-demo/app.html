@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time GPS Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f7;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+        .panel {
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 260px;
+            border-radius: 10px;
+            max-height: calc(100vh - 20px);
+            overflow-y: auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
+        }
+        .panel h2 {
+            font-size: 14px;
+            margin: 0 0 8px;
+            color: #333;
+        }
+        .controls input, .controls button {
+            margin: 4px 0;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px;
+            font-size: 12px;
+        }
+        button {
+            background-color: #f0f0f5;
+            color: #333;
+            border: 1px solid #d0d0d5;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 8px;
+        }
+        button:disabled {
+            background-color: #e0e0e5;
+            cursor: not-allowed;
+        }
+        button:hover {
+            background-color: #d0d0d5;
+        }
+        @media (max-width: 600px) {
+            .panel {
+                width: 100%;
+                height: auto;
+                top: auto;
+                right: auto;
+                bottom: 0;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            #map {
+                height: calc(100vh - 120px);
+            }
+        }
+        .popup {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #333;
+            color: white;
+            border-radius: 6px;
+            padding: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            max-width: 300px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .popup button {
+            background-color: #444;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 6px;
+            color: white;
+            font-size: 10px;
+            margin-top: 8px;
+        }
+        .popup button:hover {
+            background-color: #333;
+        }
+        .chart-container {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 10px;
+            width: 300px;
+            max-height: 200px;
+            overflow: hidden;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="panel" id="panel">
+        <div id="panel-login">
+            <h2>Create/Log In</h2>
+            <div class="controls">
+                <input type="text" id="username" placeholder="Enter username">
+                <button onclick="createUser()">Create/Log In</button>
+            </div>
+        </div>
+        <div id="panel-logged-in" class="hidden">
+            <h2>Welcome, <span id="user-name"></span></h2>
+            <h2>Save Location</h2>
+            <button id="saveLocationBtn" onclick="saveLocation()" disabled>Save My Location</button>
+            <h2>Real-Time Tracking</h2>
+            <button onclick="startFetchingLocations()">Start Tracking</button>
+            <button onclick="stopFetchingLocations()">Stop Tracking</button>
+            <h2>Fetch Historical Locations</h2>
+            <button id="fetchLocationsBtn" onclick="fetchLocations()" disabled>Fetch Locations</button>
+        </div>
+    </div>
+    <div id="popup" class="popup">
+        <p id="popup-message"></p>
+        <button onclick="hidePopup()">Close</button>
+    </div>
+    <div class="chart-container">
+        <canvas id="speedChart"></canvas>
+    </div>
+    <script>
+        const apiUrl = 'https://dynamic-trajectory.vercel.app/';
+        let map, userMarker, polyline, speedChart;
+        let intervalId = null;
+        let userLineCoords = [];
+        let speedData = [];
+        let timestamps = [];
+
+        function initMap() {
+            map = L.map('map').setView([22.3059579,114.1861733], 12);
+                L.tileLayer(
+        "https://landsd.azure-api.net/dev/osm/xyz/basemap/gs/WGS84/tile/{z}/{x}/{y}.png?key=f4d3e21d4fc14954a1d5930d4dde3809"
+    ).addTo(map);
+
+    L.tileLayer(
+        "https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png",
+        {
+            attribution: '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">&copy;Map from LandsD </a>',
+            maxZoom: 18
+        }
+    ).addTo(map);
+
+            userMarker = L.circleMarker([0, 0], { radius: 6, fillColor: 'red', color: 'red', weight: 1 }).addTo(map);
+            polyline = L.polyline([], { color: 'red' }).addTo(map);
+
+            const ctx = document.getElementById('speedChart').getContext('2d');
+            speedChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{
+                        label: 'Average Speed (m/s)',
+                        data: speedData,
+                        borderColor: 'red',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'second' },
+                            title: { display: true, text: 'Time' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Speed (m/s)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function createUser() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                showPopup('Please enter a username.');
+                return;
+            }
+            try {
+                const response = await fetch(`${apiUrl}/create_user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const result = await response.json();
+                showPopup(result.message);
+                document.getElementById('username').disabled = true;
+                document.getElementById('saveLocationBtn').disabled = false;
+                document.getElementById('fetchLocationsBtn').disabled = false;
+                document.getElementById('panel-login').classList.add('hidden');
+                document.getElementById('panel-logged-in').classList.remove('hidden');
+                document.getElementById('user-name').textContent = username;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function saveLocation() {
+            if (!navigator.geolocation) {
+                showPopup('Geolocation is not supported by this browser.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(async position => {
+                const { latitude: lat, longitude: lon } = position.coords;
+                const username = document.getElementById('username').value;
+                try {
+                    const response = await fetch(`${apiUrl}/save_location`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, latitude: lat, longitude: lon })
+                    });
+                    const result = await response.json();
+                    showPopup(result.message);
+                    updateMap(lat, lon);
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            });
+        }
+
+        async function fetchLocations() {
+            const username = document.getElementById('username').value;
+            if (!username) {
+                showPopup('Please enter a username.');
+                return;
+            }
+            try {
+                const response = await fetch(`${apiUrl}/get_locations/${username}`);
+                const data = await response.json();
+                updateMapWithLocations(data);
+            } catch (error) {
+                console.error('Error:', error);
+                showPopup('Error fetching locations. Make sure the username is correct.');
+            }
+        }
+
+        function updateMap(lat, lon) {
+            const location = [lat, lon];
+            userMarker.setLatLng(location);
+            map.setView(location, 17);
+            userLineCoords.push(location);
+            polyline.setLatLngs(userLineCoords);
+        }
+
+        function updateMapWithLocations(locations) {
+            if (locations.length === 0) {
+                showPopup('No locations found for this user.');
+                return;
+            }
+
+            const coords = locations.map(loc => [loc.latitude, loc.longitude]);
+            polyline.setLatLngs(coords);
+            map.setView(coords[coords.length - 1], 17);
+        }
+
+        function computeAverageSpeed(locations) {
+            if (locations.length < 2) return 0;
+
+            let totalDistance = 0;
+            for (let i = 1; i < locations.length; i++) {
+                const { latitude: lat1, longitude: lon1, timestamp: t1 } = locations[i - 1];
+                const { latitude: lat2, longitude: lon2, timestamp: t2 } = locations[i];
+                totalDistance += getDistance(lat1, lon1, lat2, lon2);
+                const timeDiff = (t2 - t1) / 1000; // in seconds
+                if (timeDiff > 0) return totalDistance / timeDiff; // in m/s
+            }
+            return 0;
+        }
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Radius of the Earth in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) ** 2 +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); // in meters
+        }
+
+        function startFetchingLocations() {
+            if (intervalId) {
+                showPopup('Location fetching is already in progress.');
+                return;
+            }
+
+            intervalId = setInterval(async () => {
+                try {
+                    const username = document.getElementById('username').value;
+                    const response = await fetch(`${apiUrl}/get_locations/${username}`);
+                    const data = await response.json();
+
+                    // Calculate average speed and update chart
+                    const averageSpeed = computeAverageSpeed(data);
+                    const now = new Date();
+                    timestamps.push(now);
+                    speedData.push(averageSpeed);
+                    speedChart.data.labels = timestamps;
+                    speedChart.data.datasets[0].data = speedData;
+                    speedChart.update();
+
+                    updateMapWithLocations(data);
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }, 5000); // Fetch every 5 seconds
+        }
+
+        function stopFetchingLocations() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+                showPopup('Stopped fetching locations.');
+            } else {
+                showPopup('No location fetching in progress.');
+            }
+        }
+
+        function showPopup(message) {
+            const popup = document.getElementById('popup');
+            const popupMessage = document.getElementById('popup-message');
+            popupMessage.textContent = message;
+            popup.style.display = 'block';
+            setTimeout(() => popup.style.display = 'none', 5000); // Auto-remove after 5 seconds
+        }
+
+        function hidePopup() {
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>
