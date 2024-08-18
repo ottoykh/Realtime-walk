@@ -18,111 +18,133 @@
             height: 100vh;
             overflow: hidden;
         }
+
         #map {
-            flex: 1;
             width: 100%;
-            height: 100%;
+            height: 70vh;
         }
+
         .panel {
             background-color: #ffffff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            padding: 10px;
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 260px;
-            border-radius: 10px;
-            max-height: calc(100vh - 20px);
+            box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30vh;
+            border-radius: 20px 20px 0 0;
             overflow-y: auto;
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            font-size: 12px;
-        }
-        .panel h2 {
             font-size: 14px;
-            margin: 0 0 8px;
+        }
+
+        .panel h2 {
+            font-size: 16px;
+            margin: 0 0 10px;
             color: #333;
         }
+
         .controls input, .controls button {
-            margin: 4px 0;
+            margin: 5px 0;
             width: 100%;
             box-sizing: border-box;
-            padding: 8px;
-            font-size: 12px;
+            padding: 10px;
+            font-size: 14px;
         }
+
         button {
-            background-color: #f0f0f5;
-            color: #333;
-            border: 1px solid #d0d0d5;
-            border-radius: 6px;
+            background-color: #007aff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
-            padding: 8px;
+            padding: 10px;
+            transition: background-color 0.3s ease;
         }
+
         button:disabled {
-            background-color: #e0e0e5;
+            background-color: #b0b0b0;
             cursor: not-allowed;
         }
-        button:hover {
-            background-color: #d0d0d5;
+
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
         }
-        @media (max-width: 600px) {
-            .panel {
-                width: 100%;
-                height: auto;
-                top: auto;
-                right: auto;
-                bottom: 0;
-                border-radius: 0;
-                box-shadow: none;
-            }
-            #map {
-                height: calc(100vh - 120px);
-            }
-        }
+
         .popup {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: #333;
+            bottom: 50vh;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
-            border-radius: 6px;
-            padding: 10px;
+            border-radius: 20px;
+            padding: 15px 20px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             display: none;
             max-width: 300px;
             text-align: center;
-            font-size: 12px;
+            font-size: 14px;
         }
-        .popup button {
-            background-color: #444;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            padding: 6px;
-            color: white;
-            font-size: 10px;
-            margin-top: 8px;
-        }
-        .popup button:hover {
-            background-color: #333;
-        }
+
         .chart-container {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background-color: #ffffff;
+            bottom: 32vh;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
             padding: 10px;
-            width: 300px;
-            max-height: 200px;
-            overflow: hidden;
+            width: calc(100% - 20px);
+            max-width: 400px;
+            height: 200px;
         }
+
         .chart-container canvas {
             width: 100% !important;
-            height: auto !important;
+            height: 100% !important;
+        }
+
+        @media (max-width: 600px) {
+            #map {
+                height: 65vh;
+            }
+            .panel {
+                height: 35vh;
+            }
+            .chart-container {
+                bottom: 38vh;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007aff;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
         }
     </style>
 </head>
@@ -133,51 +155,44 @@
             <h2>Create/Log In</h2>
             <div class="controls">
                 <input type="text" id="username" placeholder="Enter username">
-                <button onclick="createUser()">Create/Log In</button>
+                <button onclick="createOrLoginUser()">Create/Log In</button>
             </div>
         </div>
         <div id="panel-logged-in" class="hidden">
             <h2>Welcome, <span id="user-name"></span></h2>
-            <h2>Save Location</h2>
-            <button id="saveLocationBtn" onclick="saveLocation()" disabled>Save My Location</button>
-            <h2>Real-Time Tracking</h2>
-            <button onclick="startFetchingLocations()">Start Tracking</button>
-            <button onclick="stopFetchingLocations()">Stop Tracking</button>
-            <h2>Fetch Historical Locations</h2>
-            <button id="fetchLocationsBtn" onclick="fetchLocations()" disabled>Fetch Locations</button>
+            <h4>Trajectory Logging</h4>
+            <button id="startTrackingBtn" onclick="startTracking()">Start Tracking</button>
+            <button id="stopTrackingBtn" onclick="stopTracking()" disabled>Stop Tracking</button>
+            <button id="plotHistoryBtn" onclick="plotHistory()">Plot History</button>
+            <div class="stats">
+                <div class="stat-item">
+                    <div id="total-distance" class="stat-value">0.0</div>
+                    <div class="stat-label">Total Distance (km)</div>
+                </div>
+            </div>
         </div>
     </div>
-    <div id="popup" class="popup">
-        <p id="popup-message"></p>
-        <button onclick="hidePopup()">Close</button>
-    </div>
+    <div id="popup" class="popup"></div>
     <div class="chart-container">
         <canvas id="speedChart"></canvas>
     </div>
     <script>
-        const apiUrl = 'https://dynamic-trajectory.vercel.app';
+        const apiUrl = 'https://dynamic-trajectory.vercel.app/';
         let map, userMarker, polyline, speedChart;
         let intervalId = null;
         let userLineCoords = [];
-        let speedData = [];
         let timestamps = [];
 
         function initMap() {
-            map = L.map('map').setView([22.3059579,114.1861733], 12);
-                L.tileLayer(
-        "https://landsd.azure-api.net/dev/osm/xyz/basemap/gs/WGS84/tile/{z}/{x}/{y}.png?key=f4d3e21d4fc14954a1d5930d4dde3809"
-    ).addTo(map);
+            map = L.map('map').setView([22.3059579, 114.1861733], 15);
+            L.tileLayer("https://landsd.azure-api.net/dev/osm/xyz/basemap/gs/WGS84/tile/{z}/{x}/{y}.png?key=f4d3e21d4fc14954a1d5930d4dde3809").addTo(map);
+            L.tileLayer("https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png", {
+                attribution: '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">&copy;Map from LandsD </a>',
+                maxZoom: 18
+            }).addTo(map);
 
-    L.tileLayer(
-        "https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png",
-        {
-            attribution: '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">&copy;Map from LandsD </a>',
-            maxZoom: 18
-        }
-    ).addTo(map);
-
-            userMarker = L.circleMarker([0, 0], { radius: 6, fillColor: 'red', color: 'red', weight: 1 }).addTo(map);
-            polyline = L.polyline([], { color: 'red' }).addTo(map);
+            userMarker = L.circleMarker([0, 0], { radius: 8, fillColor: '#007aff', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+            polyline = L.polyline([], { color: '#007aff', weight: 3 }).addTo(map);
 
             const ctx = document.getElementById('speedChart').getContext('2d');
             speedChart = new Chart(ctx, {
@@ -185,9 +200,9 @@
                 data: {
                     labels: timestamps,
                     datasets: [{
-                        label: 'Average Speed (m/s)',
-                        data: speedData,
-                        borderColor: 'red',
+                        label: 'Time Collected',
+                        data: timestamps.map((_, index) => index), // Simple index for y-axis
+                        borderColor: '#007aff',
                         borderWidth: 2,
                         fill: false
                     }]
@@ -202,7 +217,7 @@
                             title: { display: true, text: 'Time' }
                         },
                         y: {
-                            title: { display: true, text: 'Speed (m/s)' },
+                            title: { display: true, text: 'Collection Count' },
                             beginAtZero: true
                         }
                     }
@@ -210,167 +225,175 @@
             });
         }
 
-        async function createUser() {
+        async function createOrLoginUser() {
             const username = document.getElementById('username').value;
             if (!username) {
                 showPopup('Please enter a username.');
                 return;
             }
+
             try {
-                const response = await fetch(`${apiUrl}/create_user`, {
+                // Attempt to create a new user
+                const response = await fetch(`${apiUrl}create_user`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username })
                 });
-                const result = await response.json();
-                showPopup(result.message);
-                document.getElementById('username').disabled = true;
-                document.getElementById('saveLocationBtn').disabled = false;
-                document.getElementById('fetchLocationsBtn').disabled = false;
-                document.getElementById('panel-login').classList.add('hidden');
-                document.getElementById('panel-logged-in').classList.remove('hidden');
-                document.getElementById('user-name').textContent = username;
+
+                if (response.ok) {
+                    // User was successfully created or logged in
+                    document.getElementById('username').disabled = true;
+                    document.getElementById('panel-login').classList.add('hidden');
+                    document.getElementById('panel-logged-in').classList.remove('hidden');
+                    document.getElementById('user-name').textContent = username;
+                    saveAndGetLocations();
+                } else if (response.status === 400) {
+                    // Username already exists or other issues
+                    document.getElementById('username').disabled = true;
+                    document.getElementById('panel-login').classList.add('hidden');
+                    document.getElementById('panel-logged-in').classList.remove('hidden');
+                    document.getElementById('user-name').textContent = username;
+                    saveAndGetLocations();
+                } else {
+                    throw new Error('Unexpected response status: ' + response.status);
+                }
             } catch (error) {
                 console.error('Error:', error);
+                showPopup('Error creating/logging in user. Please try again.');
             }
         }
 
-        async function saveLocation() {
+        async function saveAndGetLocations() {
             if (!navigator.geolocation) {
                 showPopup('Geolocation is not supported by this browser.');
                 return;
             }
+
             navigator.geolocation.getCurrentPosition(async position => {
-                const { latitude: lat, longitude: lon } = position.coords;
+                const { latitude, longitude } = position.coords;
                 const username = document.getElementById('username').value;
+
+                if (latitude == null || longitude == null) {
+                    showPopup('Location data is not available.');
+                    return;
+                }
+
                 try {
-                    const response = await fetch(`${apiUrl}/save_location`, {
+                    const response = await fetch(`${apiUrl}locations`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, latitude: lat, longitude: lon })
+                        body: JSON.stringify({ username, latitude, longitude })
                     });
-                    const result = await response.json();
-                    showPopup(result.message);
-                    updateMap(lat, lon);
+
+                    if (response.ok) {
+                        const locations = await response.json();
+                        updateMapWithLocations(locations);
+                        showPopup('Location saved and fetched successfully.');
+                    } else {
+                        throw new Error('Error saving location: ' + response.status);
+                    }
                 } catch (error) {
                     console.error('Error:', error);
+                    showPopup('Error saving/fetching locations. Please try again.');
                 }
+            }, error => {
+                console.error('Geolocation error:', error);
+                showPopup('Error getting location.');
             });
-        }
-
-        async function fetchLocations() {
-            const username = document.getElementById('username').value;
-            if (!username) {
-                showPopup('Please enter a username.');
-                return;
-            }
-            try {
-                const response = await fetch(`${apiUrl}/get_locations/${username}`);
-                const data = await response.json();
-                updateMapWithLocations(data);
-            } catch (error) {
-                console.error('Error:', error);
-                showPopup('Error fetching locations. Make sure the username is correct.');
-            }
-        }
-
-        function updateMap(lat, lon) {
-            const location = [lat, lon];
-            userMarker.setLatLng(location);
-            map.setView(location, 17);
-            userLineCoords.push(location);
-            polyline.setLatLngs(userLineCoords);
-        }
-
-        function updateMapWithLocations(locations) {
-            if (locations.length === 0) {
-                showPopup('No locations found for this user.');
-                return;
-            }
-
-            const coords = locations.map(loc => [loc.latitude, loc.longitude]);
-            polyline.setLatLngs(coords);
-            map.setView(coords[coords.length - 1], 17);
-        }
-
-        function computeAverageSpeed(locations) {
-            if (locations.length < 2) return 0;
-
-            let totalDistance = 0;
-            for (let i = 1; i < locations.length; i++) {
-                const { latitude: lat1, longitude: lon1, timestamp: t1 } = locations[i - 1];
-                const { latitude: lat2, longitude: lon2, timestamp: t2 } = locations[i];
-                totalDistance += getDistance(lat1, lon1, lat2, lon2);
-                const timeDiff = (t2 - t1) / 1000; // in seconds
-                if (timeDiff > 0) return totalDistance / timeDiff; // in m/s
-            }
-            return 0;
-        }
-
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Radius of the Earth in meters
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-            const a = Math.sin(Δφ / 2) ** 2 +
-                      Math.cos(φ1) * Math.cos(φ2) *
-                      Math.sin(Δλ / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); // in meters
-        }
-
-        function startFetchingLocations() {
-            if (intervalId) {
-                showPopup('Location fetching is already in progress.');
-                return;
-            }
-
-            intervalId = setInterval(async () => {
-                try {
-                    const username = document.getElementById('username').value;
-                    const response = await fetch(`${apiUrl}/get_locations/${username}`);
-                    const data = await response.json();
-
-                    // Calculate average speed and update chart
-                    const averageSpeed = computeAverageSpeed(data);
-                    const now = new Date();
-                    timestamps.push(now);
-                    speedData.push(averageSpeed);
-                    speedChart.data.labels = timestamps;
-                    speedChart.data.datasets[0].data = speedData;
-                    speedChart.update();
-
-                    updateMapWithLocations(data);
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            }, 5000); // Fetch every 5 seconds
-        }
-
-        function stopFetchingLocations() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-                showPopup('Stopped fetching locations.');
-            } else {
-                showPopup('No location fetching in progress.');
-            }
         }
 
         function showPopup(message) {
             const popup = document.getElementById('popup');
-            const popupMessage = document.getElementById('popup-message');
-            popupMessage.textContent = message;
+            popup.textContent = message;
             popup.style.display = 'block';
-            setTimeout(() => popup.style.display = 'none', 5000); // Auto-remove after 5 seconds
+            setTimeout(() => {
+                popup.style.display = 'none';
+            }, 3000);
         }
 
-        function hidePopup() {
-            document.getElementById('popup').style.display = 'none';
+        function updateMapWithLocations(locations) {
+            if (!Array.isArray(locations) || locations.length === 0) return;
+            const latestLocation = locations[locations.length - 1];
+            userMarker.setLatLng([latestLocation.latitude, latestLocation.longitude]);
+            map.setView([latestLocation.latitude, latestLocation.longitude], 17);
+            polyline.setLatLngs(locations.map(loc => [loc.latitude, loc.longitude]));
+            
+            updateStats(locations);
+            updateSpeedChart(locations);
         }
 
-        window.onload = initMap;
+        function updateStats(locations) {
+            const totalDistance = calculateTotalDistance(locations);
+            document.getElementById('total-distance').textContent = totalDistance.toFixed(2);
+        }
+
+        function calculateTotalDistance(locations) {
+            let totalDistance = 0;
+            for (let i = 1; i < locations.length; i++) {
+                totalDistance += calculateDistance(
+                    locations[i-1].latitude, locations[i-1].longitude,
+                    locations[i].latitude, locations[i].longitude
+                );
+            }
+            return totalDistance;
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function updateSpeedChart(locations) {
+            if (locations.length < 1) return;
+            timestamps.push(new Date(locations[locations.length - 1].timestamp));
+            
+            if (timestamps.length > 20) {
+                timestamps.shift();
+            }
+
+            speedChart.data.labels = timestamps;
+            speedChart.data.datasets[0].data = timestamps.map((_, index) => index); // Simple index for y-axis
+            speedChart.update();
+        }
+
+        function startTracking() {
+            intervalId = setInterval(() => {
+                saveAndGetLocations();
+            }, 10000);
+            document.getElementById('startTrackingBtn').disabled = true;
+            document.getElementById('stopTrackingBtn').disabled = false;
+            showPopup('Tracking started.');
+        }
+
+        function stopTracking() {
+            clearInterval(intervalId);
+            document.getElementById('startTrackingBtn').disabled = false;
+            document.getElementById('stopTrackingBtn').disabled = true;
+            showPopup('Tracking stopped.');
+        }
+
+        async function plotHistory() {
+            const username = document.getElementById('username').value;
+            try {
+                const response = await fetch(`${apiUrl}locations?username=${username}`);
+                const locations = await response.json();
+                updateMapWithLocations(locations);
+                showPopup('Historical data plotted successfully.');
+            } catch (error) {
+                console.error('Error:', error);
+                showPopup('Error fetching historical data. Please try again.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+        });
     </script>
 </body>
 </html>
